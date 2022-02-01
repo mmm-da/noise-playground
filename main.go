@@ -1,42 +1,14 @@
 package main
 
 import (
-	"fmt"
-	"log"
+	"noise_playground/constants"
+	"noise_playground/render"
+	"noise_playground/shaders"
 	"runtime"
 
 	"github.com/go-gl/gl/v4.1-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
 )
-
-const (
-	width  = 500
-	height = 500
-)
-
-func main() {
-	defer glfw.Terminate()
-	runtime.LockOSThread()
-
-	window := initGlfw()
-	program := initOpenGL()
-
-	for !window.ShouldClose() {
-		draw(window, program)
-	}
-}
-
-func initOpenGL() uint32 {
-	if err := gl.Init(); err != nil {
-		panic(err)
-	}
-	version := gl.GoStr(gl.GetString(gl.VERSION))
-	log.Println("OpenGL version", version)
-
-	prog := gl.CreateProgram()
-	gl.LinkProgram(prog)
-	return prog
-}
 
 func initGlfw() *glfw.Window {
 	if err := glfw.Init(); err != nil {
@@ -49,7 +21,7 @@ func initGlfw() *glfw.Window {
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 	glfw.WindowHint(glfw.OpenGLForwardCompatible, glfw.True)
 
-	window, err := glfw.CreateWindow(width, height, "Noise playground", nil, nil)
+	window, err := glfw.CreateWindow(constants.Width, constants.Height, "Noise playground", nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -58,36 +30,24 @@ func initGlfw() *glfw.Window {
 	return window
 }
 
-func draw(window *glfw.Window, program uint32) {
-	gl.ClearColor(1.0, 0.0, 0.0, 1.0)
-	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
-	gl.UseProgram(program)
+func main() {
+	defer glfw.Terminate()
+	runtime.LockOSThread()
 
-	var VAO, VBO uint32
-	gl.GenVertexArrays(1, &VAO)
-	gl.GenBuffers(1, &VBO)
-	gl.BindVertexArray(VAO)
-	gl.BindBuffer(gl.ARRAY_BUFFER, VBO)
+	vertexShader, err := shaders.NewShaderFromFile("./glsl/vertex.glsl", gl.VERTEX_SHADER)
+	panic_if_error(err)
 
-	var pixelData [height][width]Pixel = generateRawPixels()
-	fmt.Println(pixelData)
+	fragmentShader, err := shaders.NewShaderFromFile("./glsl/fragment.glsl", gl.FRAGMENT_SHADER)
+	panic_if_error(err)
 
-	glfw.PollEvents()
-	window.SwapBuffers()
-}
+	program, err := shaders.NewProgram(vertexShader, fragmentShader)
+	panic_if_error(err)
 
-type Pixel struct {
-	x     int
-	y     int
-	color float32
-}
+	err = program.Link()
+	panic_if_error(err)
 
-func generateRawPixels() [height][width]Pixel {
-	var buffer [height][width]Pixel
-	for i := 0; i < height; i++ {
-		for j := 0; j < width; j++ {
-			buffer[i][j] = Pixel{i, j, 0.0}
-		}
-	}
-	return buffer
+	window := initGlfw()
+
+	render.RenderLoop(window, program)
+
 }
